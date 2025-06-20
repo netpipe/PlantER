@@ -22,7 +22,7 @@
 #include <QTimer>
 #include <QLabel>
 #include <qcalendarwidget.h>
-
+#include <QCloseEvent>
 class GardenDemo : public QMainWindow {
     Q_OBJECT
 
@@ -55,7 +55,7 @@ private:
 
     void setupDB() {
         QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
-        db.setDatabaseName("garden_demo.db");
+        db.setDatabaseName(QApplication::applicationDirPath() + "/garden_demo.db");
         if (!db.open()) {
             qDebug() << "DB open error:" << db.lastError();
         }
@@ -400,14 +400,19 @@ private:
         setCentralWidget(central);
         resize(800, 400);
     }
-
+    void showWindow() {
+        this->show();
+    }
     void setupTray() {
         trayIcon = new QSystemTrayIcon(QIcon::fromTheme("media-playback-start"), this);
+        trayIcon = new QSystemTrayIcon(QIcon(QApplication::applicationDirPath() + "/mac128.png"), this);
         QMenu* menu = new QMenu;
         QAction* quitAction = menu->addAction("Quit");
+                menu->addAction("Show Window", this, &GardenDemo::showWindow);
         connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
         trayIcon->setContextMenu(menu);
         trayIcon->show();
+        trayIcon->setVisible(true);
     }
 
     void loadTents() {
@@ -570,6 +575,15 @@ private:
         if (!soundFile.isEmpty()) {
             player->setMedia(QUrl::fromLocalFile(soundFile));
             player->play();
+        }
+    }
+protected:
+    void closeEvent(QCloseEvent *event) override {
+        if (trayIcon->isVisible()) {
+            hide();
+            event->ignore();
+        } else {
+            event->accept();
         }
     }
 };
