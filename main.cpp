@@ -90,7 +90,7 @@ private:
 
     void checkHarvestAlerts() {
         QDate today = QDate::currentDate();
-        QSqlQuery q("SELECT name, start_date, flower_time_days FROM plants");
+        QSqlQuery q("SELECT name, flower_start_date, flower_time_days FROM plants");
         while (q.next()) {
             QString name = q.value(0).toString();
             QDate start = QDate::fromString(q.value(1).toString(), "yyyy-MM-dd");
