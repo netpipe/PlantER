@@ -61,7 +61,7 @@ private:
         }
         QSqlQuery q;
         q.exec("CREATE TABLE IF NOT EXISTS tents (id INTEGER PRIMARY KEY, name TEXT, feed2x INT, feed1 TEXT, feed2 TEXT, water_days TEXT, feed_days TEXT, sound TEXT)");
-        q.exec("CREATE TABLE IF NOT EXISTS plants (id INTEGER PRIMARY KEY, name TEXT, tent_id INT, flower_time_days INT,start_date TEXT)");
+        q.exec("CREATE TABLE IF NOT EXISTS plants (id INTEGER PRIMARY KEY, name TEXT, tent_id INT, flower_time_days INT,flower_start_date TEXT,start_date TEXT)");
     }
 
     void reassignPlantToTent() {
@@ -137,7 +137,7 @@ private:
         calendar->setDateTextFormat(QDate(), QTextCharFormat());
 
         QSqlQuery q;
-        q.prepare("SELECT start_date, flower_time_days FROM plants WHERE name = ?");
+        q.prepare("SELECT start_date, flower_time_days, flower_start_date FROM plants WHERE name = ?");
         q.addBindValue(plantName);
 
         if (!q.exec()) {
@@ -148,6 +148,7 @@ private:
         if (q.next()) {
             qDebug() << "test";
             QDate startDate = QDate::fromString(q.value(0).toString(), "yyyy-MM-dd");
+            QDate flowerstartDate = QDate::fromString(q.value(2).toString(), "yyyy-MM-dd");
             int flowerDays = q.value(1).toInt();
              qDebug() << flowerDays;
               qDebug() <<  QDate::fromString(q.value(0).toString(), "yyyy-MM-dd");
@@ -172,12 +173,14 @@ private:
                 calendar->setDateTextFormat(d, vegFormat);
                 d = d.addDays(1);
             }
-
+d = flowerstartDate;
             // Apply flowering days
             for (int i = 0; i < flowerDays; ++i) {
                 calendar->setDateTextFormat(d, flowerFormat);
                 d = d.addDays(1);
             }
+
+            calendar->setDateTextFormat(flowerstartDate, vegFormat);
         }
           qDebug() << "update";
         calendar->update();  // force redraw
@@ -244,7 +247,7 @@ private:
     }
 
     void saveFlowerTime() {
-        if (!plantNameEdit || !flowerInput) {
+        if (!plantNameEdit || !flowerInput || !calendar) {
             qDebug() << "UI elements not initialized!";
             return;
         }
@@ -262,10 +265,14 @@ private:
             return;
         }
 
+        QDate selectedDate = calendar->selectedDate();
+        QString flowerStartDateStr = selectedDate.toString("yyyy-MM-dd");
+
         QSqlQuery q;
-        q.prepare("UPDATE plants SET flower_time_days = ? WHERE name = ?");
-        q.addBindValue(flowerTime);     // First ?
-        q.addBindValue(plantName);      // Second ?
+        q.prepare("UPDATE plants SET flower_time_days = ?, flower_start_date = ? WHERE name = ?");
+        q.addBindValue(flowerTime);
+        q.addBindValue(flowerStartDateStr);
+        q.addBindValue(plantName);
 
         if (!q.exec()) {
             qDebug() << "SQL error:" << q.lastError().text();
@@ -273,11 +280,9 @@ private:
             return;
         }
 
-        QMessageBox::information(this, "Saved", "Flowering time updated successfully.");
-        markPlantDatesOnCalendar();  // Refresh calendar view
+        QMessageBox::information(this, "Saved", "Flowering time and start date saved!");
+        markPlantDatesOnCalendar();  // Refresh view
     }
-
-
 
 
     void setupUI() {
