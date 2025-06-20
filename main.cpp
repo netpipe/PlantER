@@ -173,14 +173,16 @@ private:
                 calendar->setDateTextFormat(d, vegFormat);
                 d = d.addDays(1);
             }
-d = flowerstartDate;
+           if (flowerstartDate.isValid())
+                d = flowerstartDate;
+
             // Apply flowering days
             for (int i = 0; i < flowerDays; ++i) {
                 calendar->setDateTextFormat(d, flowerFormat);
                 d = d.addDays(1);
             }
 
-            calendar->setDateTextFormat(flowerstartDate, vegFormat);
+            //calendar->setDateTextFormat(flowerstartDate, vegFormat);
         }
           qDebug() << "update";
         calendar->update();  // force redraw
