@@ -23,7 +23,6 @@
 #include <QRandomGenerator>
 #include <QtMath>
 
-
 // Enhanced genome structure
 struct PlantGenome {
     QString strain = "Unnamed";
@@ -45,6 +44,9 @@ struct PlantGenome {
 
     int seedYield = 50;
     float sativaRatio = 0.5f; // 0 = indica, 1 = sativa
+
+    float plantDensity = 1.0f; // 1 = default spacing, >1 = more branches
+    float maxHeight = 300.0f;  // max height for full maturity
 
     bool twinNode = false;
     bool triploid = false;
@@ -80,8 +82,11 @@ protected:
         painter.setPen(thinPen);
         painter.drawLine(start, end);
 
-        // Bud at tip
+        // Leaf below budsite
         if (depth == 1) {
+            painter.setBrush(Qt::darkGreen);
+            painter.drawEllipse(QPointF(end.x() - 4, end.y() + 3), 6, 3);
+
             painter.setBrush(Qt::magenta);
             float budSize = plant.genome.budDensity * 5.0f;
             painter.drawEllipse(end, budSize, budSize);
@@ -89,8 +94,8 @@ protected:
         }
 
         float nextLen = length * 0.7f;
-        drawBranch(painter, end, angle - 20, depth - 1, nextLen, plant);
-        drawBranch(painter, end, angle + 20, depth - 1, nextLen, plant);
+        drawBranch(painter, end, angle - 15, depth - 1, nextLen, plant);
+        drawBranch(painter, end, angle + 15, depth - 1, nextLen, plant);
     }
 
     void paintEvent(QPaintEvent*) override {
@@ -99,7 +104,7 @@ protected:
 
         int plantIndex = 0;
         for (const Plant& plant : *plants) {
-            float stemHeight = qMin(plant.age * plant.genome.tipSpeed, 300.0f);
+            float stemHeight = qMin(plant.age * plant.genome.tipSpeed, plant.genome.maxHeight);
             float baseY = this->height() - 20;
             float baseX = 50 + plantIndex * 120;
 
@@ -114,16 +119,18 @@ protected:
             // Draw main stem
             painter.drawRect(baseX, baseY - stemHeight, 6, stemHeight);
 
-            // Draw alternating left/right branches symmetrically
-            int spacing = 25;
+            // Draw alternating left/right upward branches
+            int spacing = qRound(25 / plant.genome.plantDensity);
             for (int y = spacing, i = 0; y < stemHeight; y += spacing, i++) {
                 QPointF node(baseX + 3, baseY - y);
                 float branchLen = 30 + (1.0f - float(y) / stemHeight) * 40;
-                float curvature = 10 * qSin(y * 0.1);
-                float angleLeft = -35 + curvature;
-                float angleRight = 35 + curvature;
-                drawBranch(painter, node, angleLeft, 3, branchLen, plant);
-                drawBranch(painter, node, angleRight, 3, branchLen, plant);
+                float upwardAngle = -75 + 10 * qSin(y * 0.1);
+                float mirrorAngle = 45 - upwardAngle;
+                if (i % 2 == 0) {
+                    drawBranch(painter, node, -upwardAngle, 3, branchLen, plant);
+                } else {
+                    drawBranch(painter, node, mirrorAngle, 3, branchLen, plant);
+                }
             }
 
             // Top bud
