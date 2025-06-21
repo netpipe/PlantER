@@ -23,6 +23,31 @@
 #include <QRandomGenerator>
 #include <QtMath>
 
+// cannabis_simulator.cpp
+// Qt 5.12 + OpenGL Cannabis Growth & Breeding Simulator
+// Step 5.1: Add curved/randomized branching & denser leaves
+
+#include <QApplication>
+#include <QMainWindow>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QPushButton>
+#include <QSlider>
+#include <QLabel>
+#include <QTextEdit>
+#include <QListWidget>
+#include <QSplitter>
+#include <QOpenGLWidget>
+#include <QTimer>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QFileDialog>
+#include <QFile>
+#include <QPainter>
+#include <QDateTime>
+#include <QRandomGenerator>
+#include <QtMath>
+
 // Enhanced genome structure
 struct PlantGenome {
     QString strain = "Unnamed";
@@ -73,29 +98,34 @@ protected:
     void drawBranch(QPainter& painter, QPointF start, float angle, int depth, float length, const Plant& plant) {
         if (depth <= 0) return;
 
-        float dx = length * qCos(qDegreesToRadians(angle));
-        float dy = -length * qSin(qDegreesToRadians(angle));
+        float curve = QRandomGenerator::global()->bounded(10.0f); // curve factor
+        float dx = length * qCos(qDegreesToRadians(angle + curve));
+        float dy = -length * qSin(qDegreesToRadians(angle + curve));
         QPointF end(start.x() + dx, start.y() + dy);
 
         QPen thinPen(painter.pen().color());
-        thinPen.setWidthF(1.0);
+        thinPen.setWidthF(0.8);
         painter.setPen(thinPen);
         painter.drawLine(start, end);
 
-        // Leaf below budsite
-        if (depth == 1) {
-            painter.setBrush(Qt::darkGreen);
-            painter.drawEllipse(QPointF(end.x() - 4, end.y() + 3), 6, 3);
+        // Dense leaf along branch
+        painter.setBrush(Qt::darkGreen);
+        for (int i = 1; i <= 3; ++i) {
+            float t = i / 4.0f;
+            QPointF mid(start.x() + t * dx, start.y() + t * dy);
+            painter.drawEllipse(mid, 4, 2);
+        }
 
+        // Budsite at tip
+        if (depth == 1) {
             painter.setBrush(Qt::magenta);
             float budSize = plant.genome.budDensity * 5.0f;
             painter.drawEllipse(end, budSize, budSize);
-            painter.setBrush(painter.pen().color());
         }
 
         float nextLen = length * 0.7f;
-        drawBranch(painter, end, angle - 15, depth - 1, nextLen, plant);
-        drawBranch(painter, end, angle + 15, depth - 1, nextLen, plant);
+        drawBranch(painter, end, angle - 20 + QRandomGenerator::global()->bounded(10), depth - 1, nextLen, plant);
+        drawBranch(painter, end, angle + 20 + QRandomGenerator::global()->bounded(10), depth - 1, nextLen, plant);
     }
 
     void paintEvent(QPaintEvent*) override {
@@ -119,13 +149,13 @@ protected:
             // Draw main stem
             painter.drawRect(baseX, baseY - stemHeight, 6, stemHeight);
 
-            // Draw alternating left/right upward branches
-            int spacing = qRound(25 / plant.genome.plantDensity);
+            // Draw curved, random branches
+            int spacing = qRound(20 / plant.genome.plantDensity);
             for (int y = spacing, i = 0; y < stemHeight; y += spacing, i++) {
                 QPointF node(baseX + 3, baseY - y);
                 float branchLen = 30 + (1.0f - float(y) / stemHeight) * 40;
-                float upwardAngle = -75 + 10 * qSin(y * 0.1);
-                float mirrorAngle = 45 - upwardAngle;
+                float upwardAngle = -70 + QRandomGenerator::global()->bounded(15);
+                float mirrorAngle = 45 - upwardAngle + QRandomGenerator::global()->bounded(15);
                 if (i % 2 == 0) {
                     drawBranch(painter, node, -upwardAngle, 3, branchLen, plant);
                 } else {
@@ -150,6 +180,7 @@ protected:
         }
     }
 };
+
 
 class MainWindow : public QMainWindow {
     QList<Plant> plants;
