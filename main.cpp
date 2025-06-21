@@ -531,11 +531,11 @@ private:
     }
 
     void removePlant() {
-        auto item = plantList->currentItem();
-        if (!item) return;
+        QString item = plantNameEdit->text();
+        //if (item = "") return;
         QSqlQuery q;
         q.prepare("DELETE FROM plants WHERE name=?");
-        q.addBindValue(item->text());
+        q.addBindValue(item);
         q.exec();
         loadPlants();
     }
