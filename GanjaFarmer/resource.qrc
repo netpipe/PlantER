@@ -1,0 +1,13 @@
+<RCC>
+  <qresource prefix="/">
+    <file>assets/images/turret_base.png</file>
+    <file>assets/images/turret_barrel.png</file>
+    <file>assets/images/airplane.png</file>
+    <file>assets/images/helicopter.png</file>
+    <file>assets/images/paratrooper.png</file>
+    <file>assets/images/background.png</file>
+    <file>assets/sounds/shoot.wav</file>
+    <file>assets/sounds/explosion.wav</file>
+    <file>assets/sounds/failure.wav</file>
+  </qresource>
+</RCC>
