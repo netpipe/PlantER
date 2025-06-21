@@ -1,6 +1,6 @@
 // cannabis_simulator.cpp
 // Qt 5.12 + OpenGL Cannabis Growth & Breeding Simulator
-// Step 1: UI Shell + Base Structure
+// Step 3: Basic OpenGL Plant Visualization
 
 #include <QApplication>
 #include <QMainWindow>
@@ -21,51 +21,125 @@
 #include <QPainter>
 #include <QDateTime>
 #include <QRandomGenerator>
+#include <QtMath>
 
-// Placeholder genome structure
+
+// Enhanced genome structure
 struct PlantGenome {
     QString strain = "Unnamed";
     QColor startColor = Qt::green;
     QColor endColor = Qt::darkGreen;
-    float budDensity = 0.8f;
-    float rootPriority = 0.5f;
+
+    float budDensity = 0.8f; // 0–1
+    float rootPriority = 0.5f; // 0=root, 1=canopy
+    float tipSpeed = 1.0f;     // tip growth multiplier
+    float recoveryRate = 0.75f;
+
     float cloneSuccessRate = 0.85f;
-    float tipSpeed = 1.0f;
+    float nutrientUseRate = 1.0f;
+    float waterUseRate = 1.0f;
+
+    float foxTailingChance = 0.05f;
+    float hermieChance = 0.03f;
+    float coldShockThreshold = 12.0f;
+
+    int seedYield = 50;
+    float sativaRatio = 0.5f; // 0 = indica, 1 = sativa
+
     bool twinNode = false;
     bool triploid = false;
-    bool hermieRisk = false;
     bool wasSTSConverted = false;
-    int seedYield = 50;
 };
 
-// Placeholder plant structure
 struct Plant {
     PlantGenome genome;
     int age = 0;
-    float hydration = 1.0f;
+    float hydration = 1.0f; // 0–1
     float nutrients = 1.0f;
+    float health = 1.0f;    // 0–1
     bool isClone = false;
     bool isFemale = true;
+    bool isHermie = false;
 };
 
 class PlantGLWidget : public QOpenGLWidget {
 public:
     QList<Plant>* plants;
     PlantGLWidget(QList<Plant>* p, QWidget* parent = nullptr) : QOpenGLWidget(parent), plants(p) {}
+
 protected:
+    void drawBranch(QPainter& painter, QPointF start, float angle, int depth, float length, const Plant& plant) {
+        if (depth <= 0) return;
+
+        float dx = length * qCos(qDegreesToRadians(angle));
+        float dy = -length * qSin(qDegreesToRadians(angle));
+        QPointF end(start.x() + dx, start.y() + dy);
+
+        QPen thinPen(painter.pen().color());
+        thinPen.setWidthF(1.0);
+        painter.setPen(thinPen);
+        painter.drawLine(start, end);
+
+        // Bud at tip
+        if (depth == 1) {
+            painter.setBrush(Qt::magenta);
+            float budSize = plant.genome.budDensity * 5.0f;
+            painter.drawEllipse(end, budSize, budSize);
+            painter.setBrush(painter.pen().color());
+        }
+
+        float nextLen = length * 0.7f;
+        drawBranch(painter, end, angle - 20, depth - 1, nextLen, plant);
+        drawBranch(painter, end, angle + 20, depth - 1, nextLen, plant);
+    }
+
     void paintEvent(QPaintEvent*) override {
         QPainter painter(this);
         painter.fillRect(rect(), Qt::black);
-        int y = 10;
+
+        int plantIndex = 0;
         for (const Plant& plant : *plants) {
-            QColor c = plant.genome.startColor;
-            if (plant.isClone) c = Qt::cyan;
-            if (plant.genome.wasSTSConverted) c = Qt::yellow;
-            painter.setPen(c);
-            painter.drawText(10, y += 15, QString("%1 (%2d) [%3]")
-                             .arg(plant.genome.strain)
-                             .arg(plant.age)
-                             .arg(plant.isClone ? "Clone" : "Seed"));
+            float stemHeight = qMin(plant.age * plant.genome.tipSpeed, 300.0f);
+            float baseY = this->height() - 20;
+            float baseX = 50 + plantIndex * 120;
+
+            QColor interpColor = QColor(
+                plant.genome.startColor.red()   + (plant.genome.endColor.red()   - plant.genome.startColor.red()) * (plant.age / 90.0f),
+                plant.genome.startColor.green() + (plant.genome.endColor.green() - plant.genome.startColor.green()) * (plant.age / 90.0f),
+                plant.genome.startColor.blue()  + (plant.genome.endColor.blue()  - plant.genome.startColor.blue()) * (plant.age / 90.0f)
+            );
+            painter.setPen(interpColor);
+            painter.setBrush(interpColor);
+
+            // Draw main stem
+            painter.drawRect(baseX, baseY - stemHeight, 6, stemHeight);
+
+            // Draw alternating left/right branches symmetrically
+            int spacing = 25;
+            for (int y = spacing, i = 0; y < stemHeight; y += spacing, i++) {
+                QPointF node(baseX + 3, baseY - y);
+                float branchLen = 30 + (1.0f - float(y) / stemHeight) * 40;
+                float curvature = 10 * qSin(y * 0.1);
+                float angleLeft = -35 + curvature;
+                float angleRight = 35 + curvature;
+                drawBranch(painter, node, angleLeft, 3, branchLen, plant);
+                drawBranch(painter, node, angleRight, 3, branchLen, plant);
+            }
+
+            // Top bud
+            painter.setBrush(Qt::magenta);
+            float budSize = plant.genome.budDensity * 10.0f;
+            painter.drawEllipse(QPointF(baseX + 3, baseY - stemHeight), budSize, budSize);
+
+            // Draw label
+            QString label = QString("%1 (%2d)%3")
+                .arg(plant.genome.strain)
+                .arg(plant.age)
+                .arg(plant.isHermie ? " H" : "");
+            painter.setPen(Qt::white);
+            painter.drawText(baseX - 10, baseY - stemHeight - 10, label);
+
+            plantIndex++;
         }
     }
 };
@@ -134,7 +208,14 @@ public:
         });
         connect(daySlider, &QSlider::valueChanged, this, [this](int val) {
             currentDay = val;
-            for (Plant& p : plants) p.age = val;
+            for (Plant& p : plants) {
+                p.age = val;
+                float growthStress = 0.0f;
+                if (p.hydration < 0.5f) growthStress += 0.2f;
+                if (p.nutrients < 0.5f) growthStress += 0.2f;
+                if (QRandomGenerator::global()->generateDouble() < p.genome.hermieChance * growthStress)
+                    p.isHermie = true;
+            }
             glWidget->update();
         });
         connect(btnSave, &QPushButton::clicked, this, &MainWindow::savePlant);
@@ -152,6 +233,7 @@ public:
         obj["strain"] = plants[0].genome.strain;
         obj["age"] = plants[0].age;
         obj["wasSTS"] = plants[0].genome.wasSTSConverted;
+        obj["sativaRatio"] = plants[0].genome.sativaRatio;
         QJsonDocument doc(obj);
         QFile f(file);
         if (f.open(QFile::WriteOnly)) {
@@ -173,6 +255,7 @@ public:
             p.genome.strain = obj["strain"].toString();
             p.age = obj["age"].toInt();
             p.genome.wasSTSConverted = obj["wasSTS"].toBool();
+            p.genome.sativaRatio = obj["sativaRatio"].toDouble();
             plants.append(p);
             log("Loaded plant: " + p.genome.strain);
             glWidget->update();

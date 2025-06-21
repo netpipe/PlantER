@@ -23,6 +23,7 @@
 #include <QLabel>
 #include <qcalendarwidget.h>
 #include <QCloseEvent>
+
 class GardenDemo : public QMainWindow {
     Q_OBJECT
 
@@ -97,8 +98,10 @@ private:
             int flowerDays = q.value(2).toInt();
             QDate harvest = start.addDays(flowerDays);
             if (harvest == today) {
+                qApp->setQuitOnLastWindowClosed(false);
                 QMessageBox::information(this, "Harvest Alert", name + " is ready to harvest today!");
                 // You can also play a sound here
+                 qApp->setQuitOnLastWindowClosed(true);
             }
         }
     }
@@ -571,11 +574,13 @@ private:
     }
 
     void showAlert(const QString& action, const QString& tentName, const QString& soundFile) {
+        qApp->setQuitOnLastWindowClosed(false);
         QMessageBox::information(this, "Garden Alert", QString("%1 Tent: %2").arg(action).arg(tentName));
         if (!soundFile.isEmpty()) {
             player->setMedia(QUrl::fromLocalFile(soundFile));
             player->play();
         }
+         qApp->setQuitOnLastWindowClosed(true);
     }
 protected:
     void closeEvent(QCloseEvent *event) override {
