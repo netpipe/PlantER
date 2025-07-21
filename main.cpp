@@ -565,7 +565,7 @@ private:
                 if (fdays[dow] == '1' && matchTime(feed1)) {
                     showAlert("Feed", tentName, sound);
                 }
-                if (feed2x && fdays[dow] == '1' && matchTime(feed2)) {
+                if (feed2x && fdays[dow] == '1' || wdays[dow] == '1' && matchTime(feed2)) {
                     showAlert("Feed (2x)", tentName, sound);
                 }
             }
